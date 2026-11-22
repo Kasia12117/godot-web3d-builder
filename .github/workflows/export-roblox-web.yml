@@ -1,0 +1,108 @@
+name: Export Roblox 2017 Viewer for Web
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  actions: read
+
+jobs:
+  export-web:
+    runs-on: ubuntu-22.04
+    timeout-minutes: 30
+
+    steps:
+      - name: Checkout Roblox Godot project
+        uses: actions/checkout@v4
+        with:
+          repository: yrlmz14/Roblox-offline-ios
+          ref: main
+          path: roblox-godot
+
+      - name: Download Godot Web template
+        uses: actions/download-artifact@v4
+        with:
+          name: godot-4.3-web-3d-template
+          path: template-download
+          repository: Kasia12117/godot-web3d-builder
+          run-id: 45039488085
+          github-token: ${{ github.token }}
+
+      - name: Install Godot 4.3
+        run: |
+          curl -fL https://github.com/godotengine/godot/releases/download/4.3-stable/Godot_v4.3-stable_linux.x86_64.zip -o godot.zip
+          mkdir godot-editor
+          unzip -q godot.zip -d godot-editor
+          GODOT_BIN="$(find "$PWD/godot-editor" -name 'Godot_v4.3-stable_linux.x86_64' -type f -print -quit)"
+          chmod +x "$GODOT_BIN"
+          echo "GODOT_BIN=$GODOT_BIN" >> "$GITHUB_ENV"
+
+          mkdir -p "$HOME/.local/share/godot/export_templates/4.3.stable"
+          TEMPLATE="$(find "$PWD/template-download" -name web_nothreads_release.zip -type f -print -quit)"
+          test -n "$TEMPLATE"
+          cp "$TEMPLATE" "$HOME/.local/share/godot/export_templates/4.3.stable/web_nothreads_release.zip"
+
+      - name: Configure Web export
+        run: |
+          cd roblox-godot
+          sed -i 's/renderer\/rendering_method="mobile"/renderer\/rendering_method="gl_compatibility"/' project.godot
+
+          cat >> export_presets.cfg <<'PRESET'
+
+          [preset.1]
+
+          name="Web"
+          platform="Web"
+          runnable=true
+          dedicated_server=false
+          custom_features=""
+          export_filter="all_resources"
+          include_filter=""
+          exclude_filter=""
+          export_path="build/web/index.html"
+          encryption_include_filters=""
+          encryption_exclude_filters=""
+          encrypt_pck=false
+          encrypt_directory=false
+
+          [preset.1.options]
+
+          custom_template/debug=""
+          custom_template/release=""
+          variant/extensions_support=false
+          variant/thread_support=false
+          vram_texture_compression/for_desktop=true
+          vram_texture_compression/for_mobile=true
+          html/export_icon=true
+          html/custom_html_shell=""
+          html/head_include=""
+          html/canvas_resize_policy=2
+          html/focus_canvas_on_start=true
+          html/experimental_virtual_keyboard=true
+          progressive_web_app/enabled=false
+          progressive_web_app/ensure_cross_origin_isolation_headers=false
+          progressive_web_app/offline_page=""
+          progressive_web_app/display=0
+          progressive_web_app/orientation=1
+          progressive_web_app/icon_144x144=""
+          progressive_web_app/icon_180x180=""
+          progressive_web_app/icon_512x512=""
+          progressive_web_app/background_color=Color(0, 0, 0, 1)
+          PRESET
+
+      - name: Export browser build
+        run: |
+          mkdir -p roblox-godot/build/web
+          "$GODOT_BIN" --headless --path roblox-godot --editor --import
+          "$GODOT_BIN" --headless --path roblox-godot --export-release "Web" roblox-godot/build/web/index.html
+          test -s roblox-godot/build/web/index.html
+          ls -lh roblox-godot/build/web/
+
+      - name: Upload browser build
+        uses: actions/upload-artifact@v4
+        with:
+          name: roblox-2017-viewer-web
+          path: roblox-godot/build/web/
+          if-no-files-found: error
+          retention-days: 7

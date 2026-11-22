@@ -95,7 +95,7 @@ jobs:
         run: |
           mkdir -p roblox-godot/build/web
           "$GODOT_BIN" --headless --path roblox-godot --editor --import
-          "$GODOT_BIN" --headless --path roblox-godot --export-release "Web" roblox-godot/build/web/index.html
+          "$GODOT_BIN" --headless --path roblox-godot --export-release "Web" "$GITHUB_WORKSPACE/roblox-godot/build/web/index.html"
           test -s roblox-godot/build/web/index.html
           ls -lh roblox-godot/build/web/
 

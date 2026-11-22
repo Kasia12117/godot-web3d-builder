@@ -1,6 +1,6 @@
 name: Export Roblox 2017 Viewer for Web
 
-on:
+"on":
   workflow_dispatch:
 
 permissions:

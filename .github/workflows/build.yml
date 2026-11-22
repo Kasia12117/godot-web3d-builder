@@ -1,0 +1,74 @@
+
+name: Build Godot 4.3 Full 3D Web Template
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: ubuntu-22.04
+    timeout-minutes: 360
+
+    steps:
+      - name: Checkout Godot 4.3 source
+        uses: actions/checkout@v4
+        with:
+          repository: godotengine/godot
+          ref: 4.3-stable
+          path: godot
+          fetch-depth: 1
+          submodules: recursive
+
+      - name: Install Emscripten
+        uses: mymindstorm/setup-emsdk@v14
+        with:
+          version: 3.1.64
+
+      - name: Install SCons
+        run: |
+          python3 -m pip install --user scons
+          echo "$HOME/.local/bin" >> "$GITHUB_PATH"
+
+      - name: Compile full 3D Web template
+        run: |
+          cd godot
+          scons platform=web target=template_release threads=no \
+            disable_3d=no \
+            disable_3d_physics=no \
+            disable_navigation_3d=no \
+            -j2
+
+      - name: Package and enforce 200 MB limit
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p artifact
+          FILE="$(find godot/bin -maxdepth 1 -type f -name 'godot.web.template_release*.zip' -print -quit)"
+
+          if [ -z "$FILE" ]; then
+            echo "ERROR: Template ZIP was not generated."
+            find godot/bin -maxdepth 1 -type f -printf '%f\n' || true
+            exit 1
+          fi
+
+          cp "$FILE" artifact/web_nothreads_release.zip
+          SIZE="$(wc -c < artifact/web_nothreads_release.zip)"
+          echo "Template size: $SIZE bytes"
+
+          if [ "$SIZE" -gt 209715200 ]; then
+            echo "ERROR: Template exceeds 200 MB."
+            exit 1
+          fi
+
+          echo "SUCCESS: Full 3D template is within 200 MB."
+
+      - name: Upload finished template
+        uses: actions/upload-artifact@v4
+        with:
+          name: godot-4.3-web-3d-template
+          path: artifact/web_nothreads_release.zip
+          if-no-files-found: error
+          retention-days: 7
